@@ -1,0 +1,26 @@
+steps:
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/my-react-app:$SHORT_SHA', '.']
+
+  # Step 2: Push image to GCR
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/my-react-app:$SHORT_SHA']
+
+  # Step 3: Set image in Kubernetes Deployment
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/react-app'
+      - 'react-app=gcr.io/$PROJECT_ID/my-react-app:$SHORT_SHA'
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=us-central1'
+      - 'CLOUDSDK_COMPUTE_ZONE=us-central1-c'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=my-gke-cluster'
+
+substitutions:
+  _DEPLOYMENT_NAME: "react-app"
+
+images:
+  - 'gcr.io/$PROJECT_ID/my-react-app:$SHORT_SHA'
