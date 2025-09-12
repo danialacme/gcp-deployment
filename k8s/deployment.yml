@@ -16,6 +16,15 @@ spec:
     spec:
       containers:
         - name: react-app
-          image: gcr.io/PROJECT_ID/my-react-app:latest   # replace PROJECT_ID
+          # Replace TAG with your image tag (we’ll use the GitHub short SHA)
+          image: us-central1-docker.pkg.dev/entry-241907/my-docker-repo/my-react-app:TAG
           ports:
             - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
