@@ -1,35 +1,40 @@
+# Cloud Build: Build → Push → Deploy to GKE (Standard cluster, us-central1)
+
+substitutions:
+  _REGION: us-central1
+  _REPO: my-docker-repo
+  _IMAGE: my-react-app
+  _CLUSTER: my-gke-standard-cluster
+  _LOCATION: us-central1
+  _NAMESPACE: default
+
 steps:
-  # Step 1: Build Docker image
-  - name: 'gcr.io/cloud-builders/docker'
+  # 1) Build image
+  - name: gcr.io/cloud-builders/docker
     args:
-      [
-        'build',
-        '-t',
-        'us-central1-docker.pkg.dev/$PROJECT_ID/my-docker-repo/my-react-app:$SHORT_SHA',
-        '.'
-      ]
+      - build
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA'
+      - .
 
-  # Step 2: Push image to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
+  # 2) Push image
+  - name: gcr.io/cloud-builders/docker
     args:
-      [
-        'push',
-        'us-central1-docker.pkg.dev/$PROJECT_ID/my-docker-repo/my-react-app:$SHORT_SHA'
-      ]
+      - push
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA'
 
-  # Step 3: Update image in Kubernetes deployment
-  - name: 'gcr.io/cloud-builders/kubectl'
+  # 3) Auth to GKE & update Deployment image (single step to keep kubecontext)
+  - name: gcr.io/google.com/cloudsdk
+    entrypoint: bash
     args:
-      [
-        'set',
-        'image',
-        'deployment/react-app',
-        'react-app=us-central1-docker.pkg.dev/$PROJECT_ID/my-docker-repo/my-react-app:$SHORT_SHA'
-      ]
-    env:
-      - 'CLOUDSDK_COMPUTE_REGION=us-central1'
-      - 'CLOUDSDK_COMPUTE_ZONE=us-central1-c'
-      - 'CLOUDSDK_CONTAINER_CLUSTER=my-gke-standard-cluster'
+      - -c
+      - |
+        set -euo pipefail
+        gcloud --quiet components install gke-gcloud-auth-plugin || true
+        gcloud container clusters get-credentials "${_CLUSTER}" --region "${_LOCATION}" --project "$PROJECT_ID"
+        kubectl -n "${_NAMESPACE}" set image deployment/react-app \
+          react-app="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:$SHORT_SHA"
+        kubectl -n "${_NAMESPACE}" rollout status deploy/react-app --timeout=180s
 
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/my-docker-repo/my-react-app:$SHORT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA'
