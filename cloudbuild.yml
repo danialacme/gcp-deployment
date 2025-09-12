@@ -29,7 +29,7 @@ steps:
     env:
       - 'CLOUDSDK_COMPUTE_REGION=us-central1'
       - 'CLOUDSDK_COMPUTE_ZONE=us-central1-c'
-      - 'CLOUDSDK_CONTAINER_CLUSTER=my-gke-cluster'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=my-gke-standard-cluster'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/my-docker-repo/my-react-app:$SHORT_SHA'
