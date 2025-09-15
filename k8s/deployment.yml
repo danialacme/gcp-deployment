@@ -16,7 +16,6 @@ spec:
     spec:
       containers:
         - name: react-app
-          # Replace TAG with your image tag (we’ll use the GitHub short SHA)
           image: us-central1-docker.pkg.dev/entry-241907/my-docker-repo/my-react-app:TAG
           ports:
             - containerPort: 80
