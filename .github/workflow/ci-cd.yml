@@ -2,9 +2,9 @@ name: ci-cd
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 permissions:
   id-token: write
@@ -15,24 +15,20 @@ env:
   GCP_REGION: us-central1
   AR_REPO: my-docker-repo
   IMAGE_NAME: my-react-app
-  GKE_CLUSTER: web-autopilot
-  GKE_LOCATION: us-central1
+  GKE_CLUSTER: my-gke-cluster         # <-- from Terraform outputs
+  GKE_LOCATION: us-central1           # <-- regional cluster
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.compute_tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,format=short
+      - name: Compute image tag (short SHA)
+        id: compute_tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Auth to GCP (OIDC)
         uses: google-github-actions/auth@v2
@@ -46,12 +42,13 @@ jobs:
       - name: Configure docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
-      - name: Build & Push
+      - name: Build & Push image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${{ steps.compute_tag.outputs.tag }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -73,7 +70,7 @@ jobs:
 
       - name: Update image tag in deployment
         run: |
-          TAG=$(echo "${{ needs.build_and_push.outputs.tag }}")
+          TAG="${{ needs.build_and_push.outputs.tag }}"
           sed -i "s|my-react-app:TAG|my-react-app:${TAG}|g" k8s/deployment.yml
 
       - name: Apply manifests
